@@ -1,0 +1,102 @@
+from flask import Flask, request, jsonify, render_template
+import sqlite3
+
+app = Flask(__name__)
+DB = "database.db"
+
+ADMIN_PASSWORD = "12345"   # এখানে নিজের পাসওয়ার্ড দাও
+
+def init_db():
+    conn = sqlite3.connect(DB)
+    cur = conn.cursor()
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS users(
+        user_id INTEGER PRIMARY KEY,
+        balance INTEGER DEFAULT 0
+    )
+    """)
+
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS withdraw(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        amount INTEGER,
+        method TEXT,
+        number TEXT,
+        status TEXT DEFAULT 'Pending'
+    )
+    """)
+
+    conn.commit()
+    conn.close()
+
+init_db()
+
+def connect():
+    return sqlite3.connect(DB)
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route("/register", methods=["POST"])
+def register():
+    user_id = request.json["user_id"]
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO users(user_id) VALUES(?)", (user_id,))
+    conn.commit()
+    conn.close()
+    return jsonify({"status":"ok"})
+
+@app.route("/balance/<int:user_id>")
+def balance(user_id):
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT balance FROM users WHERE user_id=?", (user_id,))
+    row = cur.fetchone()
+    conn.close()
+    return jsonify({"balance": row[0] if row else 0})
+
+@app.route("/earn", methods=["POST"])
+def earn():
+    data = request.json
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("UPDATE users SET balance=balance+? WHERE user_id=?",
+                (data["amount"], data["user_id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"status":"earned"})
+
+@app.route("/withdraw", methods=["POST"])
+def withdraw():
+    data = request.json
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("""
+    INSERT INTO withdraw(user_id,amount,method,number)
+    VALUES(?,?,?,?)
+    """,(data["user_id"],data["amount"],data["method"],data["number"]))
+
+    cur.execute("UPDATE users SET balance=balance-? WHERE user_id=?",
+                (data["amount"],data["user_id"]))
+
+    conn.commit()
+    conn.close()
+    return jsonify({"status":"pending"})
+
+@app.route("/admin")
+def admin():
+    password = request.args.get("password")
+    if password != ADMIN_PASSWORD:
+        return "Unauthorized"
+
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM withdraw")
+    rows = cur.fetchall()
+    conn.close()
+
+    return render_template("admin.html", data=rows)
