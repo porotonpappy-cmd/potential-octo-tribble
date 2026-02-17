@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Income Pro</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+body{background:#0f172a;color:white;text-align:center;font-family:sans-serif;}
+.card{background:#1e293b;padding:20px;margin:15px;border-radius:15px;}
+button{padding:10px;border:none;border-radius:10px;margin:5px;}
+.green{background:#22c55e;color:white;}
+.red{background:#ef4444;color:white;}
+</style>
+</head>
+<body>
+
+<h2>💰 Telegram Income Pro</h2>
+
+<div class="card">
+<p id="name"></p>
+<p>Balance: ৳ <span id="balance">0</span></p>
+
+<button class="green" onclick="earn(5)">📺 Watch Ad (+5)</button>
+<button class="green" onclick="earn(10)">🎮 Task (+10)</button>
+<button class="red" onclick="withdraw()">💳 Withdraw</button>
+</div>
+
+<script>
+let tg = window.Telegram.WebApp;
+tg.expand();
+let user = tg.initDataUnsafe.user;
+
+document.getElementById("name").innerText = "Hello " + user.first_name;
+
+fetch("/register",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({user_id:user.id})
+});
+
+function loadBalance(){
+fetch("/balance/"+user.id)
+.then(res=>res.json())
+.then(data=>{
+document.getElementById("balance").innerText=data.balance;
+});
+}
+loadBalance();
+
+function earn(amount){
+fetch("/earn",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({user_id:user.id,amount:amount})
+});
+loadBalance();
+}
+
+function withdraw(){
+let number = prompt("Enter bKash/Nagad Number:");
+fetch("/withdraw",{
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body:JSON.stringify({
+user_id:user.id,
+amount:100,
+method:"bKash",
+number:number
+})
+});
+alert("Withdraw Request Sent");
+loadBalance();
+}
+</script>
+
+</body>
+</html>
